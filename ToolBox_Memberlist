@@ -1,0 +1,140 @@
+// ==UserScript==
+// @name           ToolBox_Memberlist
+// @author         Lars
+// @description    Daten runterladen
+// @include        https://cncapp*.alliances.commandandconquer.com/*/index.aspx*
+// @version        0.1
+// @grant          none
+// ==/UserScript==
+(function(){
+    var injectFunction = function() {
+        function createClass()
+        {
+            qx.Class.define("ToolBox_Memberlist",
+                            {
+                type: "singleton",
+                extend: qx.core.Object,
+                construct: function()
+                {
+                    try
+                    {
+                        var ToolBoxMainFenster = window.ToolBoxMain.getInstance().ToolBoxFenster;
+                        var MemberlistButton = new qx.ui.form.Button("Memberlist").set({
+                            toolTipText: "Memberlist",
+                            width: 140,
+                            height: 25,
+                            maxWidth: 140,
+                            maxHeight: 25,
+                        });
+                        MemberlistButton.addListener("click", function (e) {
+                            var allmembers = ClientLib.Data.MainData.GetInstance().get_Alliance().get_MemberDataAsArray();
+                            var membercount = ClientLib.Data.MainData.GetInstance().get_Alliance().get_NumMembers();
+                            var tempmem;
+                            for (var k = 0; k < membercount; k++) {
+                                for (var j = membercount - 1; j >= k; j--) {
+                                    //console.log(k + ","+ j + ":" + allmembers[k].Name + ";" + allmembers[k].AvgDefenseLvl + ">" + allmembers[j].Name + ";" + allmembers[j].AvgDefenseLvl)
+                                    if (allmembers[k].AvgDefenseLvl > allmembers[j].AvgDefenseLvl) {
+                                        tempmem = allmembers[k];
+                                        allmembers[k] = allmembers[j];
+                                        allmembers[j] = tempmem;
+                                    }
+                                }
+                            }
+                            var dateitext = "";
+                            var BestOffenseLvl;
+                            var BestDefenseLvl;
+                            var AvgOffenseLvl;
+                            var AvgDefenseLvl;
+                            dateitext += "Name;Rank;BestOff;BestDef;AvgOff;AvgDef\r\n"
+                            for (var l = membercount - 1; l >= 0; l--) {
+                                var tempmember = allmembers[l];
+                                BestOffenseLvl = (Math.round((tempmember.BestOffenseLvl + Number.EPSILON) * 100) / 100).toString().replace(".",",");
+                                BestDefenseLvl = (Math.round((tempmember.BestDefenseLvl + Number.EPSILON) * 100) / 100).toString().replace(".",",");
+                                AvgOffenseLvl = (Math.round((tempmember.AvgOffenseLvl + Number.EPSILON) * 100) / 100).toString().replace(".",",");
+                                AvgDefenseLvl = (Math.round((tempmember.AvgDefenseLvl + Number.EPSILON) * 100) / 100).toString().replace(".",",");
+                                console.log(tempmember.Name + ";" + tempmember.Rank + ";" + BestOffenseLvl + ";" + BestDefenseLvl + ";" + AvgOffenseLvl + ";" + AvgDefenseLvl);
+                                dateitext += tempmember.Name + ";" + tempmember.Rank + ";" + BestOffenseLvl + ";" + BestDefenseLvl + ";" + AvgOffenseLvl + ";" + AvgDefenseLvl + "\r\n"
+                            }
+                            var elLink = document.createElement("a");
+                            var oBlob = new Blob([ dateitext ], { type: "text/plain" });
+                            elLink.download = "/Memberlist.csv";
+                            var oLastUrl = window.URL.createObjectURL(oBlob);
+                            elLink.href = oLastUrl;
+                            document.body.appendChild(elLink);
+                            elLink.click();
+                            document.body.removeChild(elLink);
+                            delete elLink;
+                        }, this);
+                        ToolBoxMainFenster.add(MemberlistButton);
+                    }
+                    catch (e) {
+                        console.log("Memberlist Fehler: ");
+                        console.log(e.toString());
+                    }
+                    console.log("Memberlist erfolgreich geladen");
+                },
+                destruct: function()
+                {
+                },
+                members:
+                {
+                }
+            });
+        }
+        function waitForGame()
+        {
+            try
+            {
+                if (typeof qx != 'undefined' && typeof qx.core != 'undefined' && typeof qx.core.Init != 'undefined' && qx.core.Init.getApplication() !== null && typeof window.ToolBoxMain != 'undefined')
+                {
+                    var app = qx.core.Init.getApplication();
+                    if (app.initDone === true && typeof window.ToolBoxMain != 'undefined')
+                    {
+                        try
+                        {
+                            createClass();
+                            //console.log("Creating phe.cnc function wraps");
+                            if (typeof phe.cnc.Util.attachNetEvent == 'undefined')
+                            {
+                                ToolBox_Memberlist.attachNetEvent = webfrontend.gui.Util.attachNetEvent;
+                                ToolBox_Memberlist.detachNetEvent = webfrontend.gui.Util.detachNetEvent;
+                            }
+                            else
+                            {
+                                ToolBox_Memberlist.attachNetEvent = phe.cnc.Util.attachNetEvent;
+                                ToolBox_Memberlist.detachNetEvent = phe.cnc.Util.detachNetEvent;
+                            }
+                            if (typeof phe.cnc.gui.util == 'undefined')
+                                ToolBox_Memberlist.getInstance().formatNumbersCompact = webfrontend.gui.Util.formatNumbersCompact;
+                            else
+                                ToolBox_Memberlist.getInstance().formatNumbersCompact = phe.cnc.gui.util.Numbers.formatNumbersCompact;
+                            ToolBox_Memberlist.getInstance();
+                        }
+                        catch(e)
+                        {
+                            console.log("ToolBox_Addon_Sektorsprung waitforgame Fehler:");
+                            console.log(e);
+                        }
+                    }
+                    else window.setTimeout(waitForGame, 1000);
+                }
+                else
+                {
+                    window.setTimeout(waitForGame, 1000);
+                }
+            }
+            catch (e)
+            {
+                if (typeof console != 'undefined') console.log(e);
+                else if (window.opera) opera.postError(e);
+                else GM_log(e);
+            }
+        }
+        window.setTimeout(waitForGame, 1000);
+    };
+    var script = document.createElement("script");
+    var txt = injectFunction.toString();
+    script.innerHTML = "(" + txt + ")();";
+    script.type = "text/javascript";
+    document.getElementsByTagName("head")[0].appendChild(script);
+})();
